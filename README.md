@@ -1,5 +1,3 @@
-# CandidateBios
-
 # Using Large Language Models for Massive Political Science Data Scraping
 
 # Abstract
