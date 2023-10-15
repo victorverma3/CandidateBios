@@ -4,7 +4,7 @@
 Large Language Models like ChatGPT have recently gained popularity, but much of their potential still needs to be explored. For this project, I developed Python software utilizing ChatGPT’s ability to efficiently summarize large amounts of text in order to obtain the biographical data of nearly 150,000 U.S. State Representative Candidates who ran for office between 1967 and 2017. Specifically, I gathered the college major, undergraduate institution, highest degree and institution, and work history of each candidate. Prior to this effort, there was no comprehensive database containing the desired biodata for this scale. This unique dataset offers us insights into the background experience and influences of state legislative candidates. First, I used the Google Custom Search JSON API to identify relevant websites for each candidate. Next, I scraped the chosen websites using the Beautiful Soup and PDF scraping libraries in Python. Finally, I utilized the ChatGPT API to efficiently summarize the scraped website text and extract the desired biodata. I found that approximately 40% of all U.S. State Representative Candidates between 1967 and 2017 had biodata available online on Google, but this percentage generally increases as one searches for more recent candidates. The gathered biodata will be used as part of a larger project studying lobbying laws and the revolving door in politics. The methodology used in this project is extremely powerful and can serve as a general blueprint to create large-scale information databases related to any topic that can be searched on the web.
 
 # Research Goals
-- Create Python software to programmatically gather the biodata of U.S. State Legislator Candidates from 1967 – 2017.
+- Create Python software to programmatically gather the biodata of U.S. state legislator candidates from 1967 – 2017.
 - Display each candidate’s college major, undergraduate institution, highest degree and institution, work history, and source URLs in a CSV file.
 - Improve my ability to write neat and efficient code.
 - Gain experience in utilizing APIs and external libraries while programming.
@@ -19,7 +19,7 @@ Large Language Models like ChatGPT have recently gained popularity, but much of 
 - Content Validation –  sample outputs were manually cross-referenced to assess the overall accuracy.
 
 # Data and Results
-- Through testing so far, I can estimate that approximately 40% of U.S. State Legislator Candidates between 1967 and 2017 had biodata available on the web. This percentage generally increases as one searches for more recent candidates.
+- Through testing so far, I can estimate that approximately 40% of U.S. state legislator candidates between 1967 and 2017 had biodata available on the web. This percentage generally increases as one searches for more recent candidates.
 - Based on the manual verification of the data produced for about 700 candidates, I can say that the final output is approximately 70% accurate.
 - If the candidates are filtered to only those who ran after 1998, this accuracy jumps to nearly 80%.
 
@@ -31,7 +31,7 @@ Large Language Models like ChatGPT have recently gained popularity, but much of 
 - The only way to get the missing data (for now) is to manually search for the candidate information.
 
 # Major Conclusions
-- It is worrying that only 40% of U.S. State Legislators have biodata available online. Who are these people who are getting elected and making decisions in our lives?
+- It is worrying that only 40% of U.S. state legislators have biodata available online. Who are these people who are getting elected and making decisions in our lives?
 - The methodology used in this project is extremely powerful and can serve as a general blueprint to create large-scale information databases related to any topic that can be searched on the web using Google.
 - Although large language models like ChatGPT are extremely powerful tools, their tendency to hallucinate necessitates a cautious and critical interpretation of their responses.
 - Human intervention can improve the quantity and quality of the data output, emphasizing the role of humans in monitoring AI in this era of technology.
@@ -43,7 +43,7 @@ Large Language Models like ChatGPT have recently gained popularity, but much of 
 - A robust methodology needs to be developed in order to verify the accuracy of the gathered data. Currently, manual verification is the only way to know if the gathered data is accurate.
 
 # Research in Context
-- My mentor, Professor Jetson Leder-Luis, is working with a team of researchers to assess the impact of revolving door lobbying laws on the composition of U.S. State Legislators.
+- My mentor, Professor Jetson Leder-Luis, is working with a team of researchers to assess the impact of revolving door lobbying laws on the composition of U.S. state legislators.
 - The biodata I am gathering will be used as part of the evaluation of the background and credentials of all the candidates.
 - Specifically, the research team will analyze the biodata using machine-learning techniques to find hidden patterns.
 
