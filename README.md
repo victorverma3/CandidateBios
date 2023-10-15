@@ -46,6 +46,7 @@ Large Language Models like ChatGPT have recently gained popularity, but much of 
 - My mentor, Professor Jetson Leder-Luis, is working with a team of researchers to assess the impact of revolving door lobbying laws on the composition of U.S. state legislators.
 - The biodata I am gathering will be used as part of the evaluation of the background and credentials of all the candidates.
 - Specifically, the research team will analyze the biodata using machine-learning techniques to find hidden patterns.
+- The database that I create will be the first of its size containing U.S. state legislator candidates and could be replicated and used by other researchers in their work.
 
 # References
 - Google’s API Documentation
