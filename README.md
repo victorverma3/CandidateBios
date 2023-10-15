@@ -32,7 +32,7 @@ Large Language Models like ChatGPT have recently gained popularity, but much of 
 
 # Major Conclusions
 - It is worrying that only 40% of U.S. state legislators have biodata available online. Who are these people who are getting elected and making decisions in our lives?
-- The methodology used in this project is extremely powerful and can serve as a general blueprint to create large-scale information databases related to any topic that can be searched on the web using Google.
+- The methodology used in this project is extremely powerful and can serve as a general blueprint to create large-scale information databases related to any topic that can be searched on the web.
 - Although large language models like ChatGPT are extremely powerful tools, their tendency to hallucinate necessitates a cautious and critical interpretation of their responses.
 - Human intervention can improve the quantity and quality of the data output, emphasizing the role of humans in monitoring AI in this era of technology.
 
