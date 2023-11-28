@@ -56,7 +56,7 @@ Large Language Models like ChatGPT have recently gained popularity, but much of 
 
 # Acknowledgements
 - Professor Jetson Leder-Luis (Boston University)
-- Professor Raymond Fisman (Harvard University)
+- Professor Raymond Fisman (Boston University)
 - Professor Silvia Vannutelli (Northwestern University)
 - Catherine O’Donnell
 - Undergraduate Research Opportunities Program
