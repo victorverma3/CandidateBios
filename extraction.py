@@ -2,15 +2,9 @@
 import concurrent.futures
 from dotenv import load_dotenv
 import json
-import openai
+from openai import OpenAI
 import os
 import pandas as pd
-from tenacity import (
-    retry,
-    retry_if_not_exception_type,
-    stop_after_attempt,
-    wait_random_exponential,
-)
 import time
 
 # Setup
@@ -19,8 +13,8 @@ retrievalData = "./retrievals.csv"  # set accordingly to relevant retrievals csv
 promptErrorData = "./promptErrors.csv"
 
 load_dotenv()
-openai.api_key = os.environ.get("openai.api_key")
-assert openai.api_key
+openai_api_key = os.environ.get("openai.api_key")
+assert openai_api_key
 
 
 # Data Extraction
@@ -42,6 +36,7 @@ def extract(csvColumns="regular"):
         output to extractions.csv.
     """
 
+    # verifies parameters
     assert csvColumns in ["regular", "condensed"]
 
     startExtract = time.perf_counter()
@@ -51,7 +46,14 @@ def extract(csvColumns="regular"):
         try:
             df = pd.read_csv(retrievalData, index_col=None, encoding="latin-1")
             prompts = [
-                [prompt, sources, full_name, min_year, state, candid]
+                {
+                    "Prompt": prompt,
+                    "Sources": sources,
+                    "Full Name": full_name,
+                    "Min Year": min_year,
+                    "State": state,
+                    "Candid": candid,
+                }
                 for prompt, sources, full_name, min_year, state, candid in zip(
                     df["ChatGPT Prompt"],
                     df["Sources"],
@@ -67,7 +69,14 @@ def extract(csvColumns="regular"):
         try:
             df = pd.read_csv(retrievalData, index_col=None, encoding="latin-1")
             prompts = [
-                [prompt, sources, full_name, min_year, state, candid]
+                {
+                    "Prompt": prompt,
+                    "Sources": sources,
+                    "Full Name": full_name,
+                    "Min Year": min_year,
+                    "State": state,
+                    "Candid": candid,
+                }
                 for prompt, sources, full_name, min_year, state, candid in zip(
                     df["chatgptprompt"],
                     df["sources"],
@@ -136,7 +145,14 @@ def extractAgain(attempt="first"):
     # processes prompt error data
     df = pd.read_csv(promptErrorData, index_col=None, encoding="latin-1")
     prompts = [
-        [prompt, sources, full_name, min_year, state, candid]
+        {
+            "Prompt": prompt,
+            "Sources": sources,
+            "Full Name": full_name,
+            "Min Year": min_year,
+            "State": state,
+            "Candid": candid,
+        }
         for prompt, sources, full_name, min_year, state, candid in zip(
             df["ChatGPT Prompt"],
             df["Sources"],
@@ -176,39 +192,92 @@ def extractAgain(attempt="first"):
     return reruns
 
 
-@retry(
-    wait=wait_random_exponential(min=45, max=75),
-    stop=stop_after_attempt(10),
-    retry=retry_if_not_exception_type(openai.error.InvalidRequestError),
-    before_sleep=lambda _: print("retrying chatFeed"),
-)
 def chatFeed(p):
     """
     Description
         - Uses the ChatGPT API to summarize the biodata from the scraped text
         and provide a JSON response.
     Parameters
-        - p: An array containing the ChatGPT prompt, source URLs, full name,
-        min year, state, and candid of a candidate. The element containing the
-        source URLs is a string array.
+        - p: A dictionary containing the ChatGPT prompt, source URLs, full name,
+        min year, state, and candid of a candidate as keys. The value containing
+        the source URLs is a string array.
     Return
-        - An array containing the ChatGPT response, source URLs, full name, min
-        year, state, and candid of a candidate. The element containing the source
-        URLs is a string array.
+        - A dictionary containing the ChatGPT response, source URLs, full name,
+        min year, state, and candid of a candidate as keys. The value containing
+        the source URLs is a string array.
     """
 
     # gets ChatGPT response
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+    client = OpenAI(api_key=openai_api_key, max_retries=10)
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo-0613",
         temperature=0,
         max_tokens=200,
         messages=[
             {"role": "system", "content": "Act as a summarizer"},
-            {"role": "system", "content": p[0]},
+            {"role": "system", "content": p["Prompt"]},
         ],
     )
-    output = [response.choices[0].message.content, p[1], p[2], p[3], p[4], p[5]]
+
+    output = p
+    output["Response"] = response.choices[0].message.content
+
     return output
+
+
+def getAge():
+    """
+    Description
+        - Uses the data gathered during the data retrieval stage to determine
+        the age of each candidate.
+    Parameters
+        - No input parameters.
+    Return
+        - An array containing the age or year of birth, source URLs, full name,
+        min year, state, and candid of a candidate. The element containing the
+        source URLs is a string array.
+    """
+
+    # converts the existing scraped data into appropriate prompts to feed into ChatGPT
+    df = pd.read_csv(
+        "../Samples/order1000retrievals.csv", index_col=None, encoding="latin-1"
+    )
+    scraped_text = df["ChatGPT Prompt"].apply(
+        lambda row: row.split("text: ")[-1].split("If any desired")[0]
+    )
+    prompts = []
+    for i in range(len(df)):
+        scraped_text[i] = (
+            f"Print a value indicating year of birth either the age of {df.iloc[i]['Full Name']}, a state representative candidate from {df.iloc[i]['State']}. If the birth year or the date of birth is present, print only the birth year as a number. If the year of undergraduate graduation is present, subtract 22 from that year and print that. No full sentences. If the information is not present, print N/A: {scraped_text[i]}"
+        )
+        prompts.append(
+            [
+                scraped_text[i],
+                df.iloc[i]["Sources"],
+                df.iloc[i]["Full Name"],
+                df.iloc[i]["Min Year"],
+                df.iloc[i]["State"],
+                df.iloc[i]["Candid"],
+            ]
+        )
+
+    # gets candidate ages using ChatGPT API and multithreading
+    outputs = []
+    promptErrors = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = {executor.submit(chatFeed, prompt): prompt for prompt in prompts[:10]}
+        for future in concurrent.futures.as_completed(futures):
+            output = futures[future]
+            try:
+                outputs.append(future.result())
+            except Exception as exc:
+                print(f"{output} extract - chatFeed generated an exception: {exc}")
+                promptErrors += [output]
+                with open("errors.txt", "a") as f:
+                    f.write(
+                        f"\n\n{output} extract - chatFeed generated an exception: {exc}"
+                    )
+    return [output[0] for output in outputs]
 
 
 def extractCSV(outputs, promptErrors, variant="normal", attempt="first"):
@@ -219,15 +288,15 @@ def extractCSV(outputs, promptErrors, variant="normal", attempt="first"):
         responses, prompt errors, and parse errors, which are stored in
         extractions.csv, promptErrors.csv, and parseErrors.csv, respectively.
     Parameters
-        - outputs: a 2D array containing the relevant candidate information for
-        each candidate as the elements in the array. Each element is itself an
-        array containing the ChatGPT response, source URLs, full name, min year,
-        state, and candid of a candidate. The element containing the source URLs
-        is a string array.
-        - promptErrors: a 2D array containing all candidates that encountered
-        prompt errors during the chatFeed function. Each element is itself an
-        array containing the ChatGPT prompt, source URLs, full name, min year,
-        state, and candid of a candidate. The element containing the source URLs
+        - outputs: an array containing the relevant candidate information for
+        each candidate as the elements in the array. Each element is itself a
+        dictionary containing the ChatGPT response, source URLs, full name, min year,
+        state, and candid of a candidate as keys. The value containing the source
+        URLs is a string array.
+        - promptErrors: an array containing all candidates that encountered
+        prompt errors during the chatFeed function. Each element is itself a
+        dictionary containing the ChatGPT prompt, source URLs, full name, min year,
+        state, and candid of a candidate. The value containing the source URLs
         is a string array.
         - variant: a string that specifies if the outputs are being processed
         normally or as part of a rerun. If variant is set to "normal", the
@@ -263,12 +332,12 @@ def extractCSV(outputs, promptErrors, variant="normal", attempt="first"):
     }
     for error in promptErrors:
         try:
-            rawPromptErrors["ChatGPT Prompt"].append(error[0])
-            rawPromptErrors["Sources"].append(error[1])
-            rawPromptErrors["Full Name"].append(error[2])
-            rawPromptErrors["Min Year"].append(error[3])
-            rawPromptErrors["State"].append(error[4])
-            rawPromptErrors["Candid"].append(error[5])
+            rawPromptErrors["ChatGPT Prompt"].append(error["Prompt"])
+            rawPromptErrors["Sources"].append(error["Sources"])
+            rawPromptErrors["Full Name"].append(error["Full Name"])
+            rawPromptErrors["Min Year"].append(error["Min Year"])
+            rawPromptErrors["State"].append(error["State"])
+            rawPromptErrors["Candid"].append(error["Candid"])
         except:
             continue
     try:
@@ -310,17 +379,21 @@ def extractCSV(outputs, promptErrors, variant="normal", attempt="first"):
             output = futures[future]
             try:
                 data = future.result()
-                if data != None and len(data) == 10:  # verifies data exists
-                    rawResults["Name"].append(data[0])
-                    rawResults["College Major"].append(data[1])
-                    rawResults["Undergraduate Institution"].append(data[2])
-                    rawResults["Highest Degree and Institution"].append(data[3])
-                    rawResults["Work History"].append(data[4])
-                    rawResults["ChatGPT Confidence"].append(data[5])
-                    rawResults["Sources"].append(data[6])
-                    rawResults["Min Year"].append(data[7])
-                    rawResults["State"].append(data[8])
-                    rawResults["Candid"].append(data[9])
+                if data != None:  # verifies data exists
+                    rawResults["Name"].append(data["Full Name"])
+                    rawResults["College Major"].append(data["College Major"])
+                    rawResults["Undergraduate Institution"].append(
+                        data["Undergraduate Institution"]
+                    )
+                    rawResults["Highest Degree and Institution"].append(
+                        data["Highest Degree and Institution"]
+                    )
+                    rawResults["Work History"].append(data["Work History"])
+                    rawResults["ChatGPT Confidence"].append(data["Confidence Level"])
+                    rawResults["Sources"].append(data["Sources"])
+                    rawResults["Min Year"].append(data["Min Year"])
+                    rawResults["State"].append(data["State"])
+                    rawResults["Candid"].append(data["Candid"])
                 elif data[0] == -1:
                     parseErrors.append(data[1])
             except Exception as exc:
@@ -385,23 +458,32 @@ def parse(output):
         and institution, and work history. Candidates whose responses get parsed
         incorrectly are appended to parseErrors.
     Parameters
-        - output: an array containing the ChatGPT response, source URLs, full
-        name, min year, state, and candid of a candidate. The element containing
+        - output: a dictionary containing the ChatGPT response, source URLs, full
+        name, min year, state, and candid of a candidate as keys. The value containing
         the source URLs is a string array.
     Return
-        - If successful, an array containing the full name, college major,
+        - If successful, a dictionary containing the full name, college major,
         undergraduate institution, highest degree and institution, work history,
-        ChatGPT confidence, sources, min year, state, and candid of a candidate.
-        The element containing the source URLs is a string array. If unsuccessful,
-        the return value is an array whose first element is -1.
+        ChatGPT confidence, sources, min year, state, and candid of a candidate
+        as keys. The value containing the source URLs is a string array.
+        If unsuccessful, the return value is an array whose first element is -1.
     """
-
-    data = []
+    # output = {"Prompt": "p", "Sources": ["source"], "Full Name": "name", "Min Year": 1, "State": "MA", "Candid": 1, "Response": '{\n  "College Major": "Biological Engineering",\n  "Undergraduate Institution": "University of Missouri-Columbia",\n  "Highest Degree and Institution": "MD, University of Missouri-Columbia",\n  "Work History": "2013-2010: Resident Physician, Internal Medicine, Barnes-Jewish Hospital//Washington University School of Medicine, St. Louis, MO\\n2017-2014: Clinical Fellow, Medical Oncology//Hematology, Barnes-Jewish Hospital//Washington University School of Medicine, St. Louis, MO\\nPresent-2021: Assistant Professor in Medicine, Department of Medicine (VA Division), Washington University School of Medicine, St. Louis, MO\\n2020-2017: Instructor in Medicine, Department of Medicine (VA Division), Washington University School of Medicine, St. Louis, MO",\n  "Confidence Level": 90\n}'}
+    data = {
+        "College Major": "",
+        "Undergraduate Institution": "",
+        "Highest Degree and Institution": "",
+        "Work History": "",
+        "Confidence Level": "",
+    }
     try:
-        d = json.loads(output[0].replace("\n", ""))  # splits JSON data
-        data = [output[2]]
-        data += d.values()  # appends ChatGPT response data
-        data += [output[1], output[3], output[4], output[5]]
+        d = json.loads(output["Response"].replace("\n", ""))  # splits JSON data
+        data["Sources"] = output["Sources"]
+        data["Full Name"] = output["Full Name"]
+        data["Min Year"] = output["Min Year"]
+        data["State"] = output["State"]
+        data["Candid"] = output["Candid"]
+        data.update(d)  # updates ChatGPT response data
     except:
         return [-1, output]
     return data

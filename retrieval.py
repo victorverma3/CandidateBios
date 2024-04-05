@@ -22,9 +22,9 @@ def retrieve(searchData=searchData, timeout=200):
         - Wrapper function used to run the data retrieval phase.
     Parameters
         - searchData: a global variable that stores the relative path to
-            searches.csv, which contains all of the information gathered in the
-            data search phase. This can optionally be configured to another CSV
-            of the proper format.
+        searches.csv, which contains all of the information gathered in the
+        data search phase. This can optionally be configured to another CSV
+        of the proper format.
     Return
         - A dataframe containing each candidate’s ChatGPT prompt, sources, full
         name, min year, state, and candid. This dataframe is also output to
@@ -40,8 +40,17 @@ def retrieve(searchData=searchData, timeout=200):
     try:
         df = pd.read_csv(searchData, index_col=None, encoding="latin-1")
         urls = [
-            [sourceParser(source), first, middle, last, full, min_year, state, candid]
-            for source, first, middle, last, full, min_year, state, candid in zip(
+            {
+                "Sources": sourceParser(sources),
+                "First": first,
+                "Middle": middle,
+                "Last": last,
+                "Full": full,
+                "Min Year": min_year,
+                "State": state,
+                "Candid": candid,
+            }
+            for sources, first, middle, last, full, min_year, state, candid in zip(
                 df["Sources"],
                 df["First"],
                 df["Middle"],
@@ -119,12 +128,10 @@ def retrieve(searchData=searchData, timeout=200):
             try:
                 prompts.append(future.result())
             except Exception as exc:
-                print(
-                    f"{prompt} retrieveRow - chatPrompt generated an exception: {exc}"
-                )
+                print(f"{prompt} retrieve - chatPrompt generated an exception: {exc}")
                 with open("errors.txt", "a") as f:
                     f.write(
-                        f"\n\n{prompt} retrieveRow - chatPrompt generated an exception: {exc}"
+                        f"\n\n{prompt} retrieve - chatPrompt generated an exception: {exc}"
                     )
     donePrompt = time.perf_counter()
     print(f"chatPrompt: {donePrompt - doneBio} seconds")
@@ -142,16 +149,19 @@ def retrieve(searchData=searchData, timeout=200):
 def splitCandidates(urls, groupSize):
     """
     Description
-        - Splits the list of candidates to be scraped into sublists of size
-        batchSize, with the last sublist containing any leftovers.
+        - Splits the array of candidates to be scraped into subarrays of size
+        batchSize, with the last subarray containing any leftovers.
     Parameters
-        - urls: A 2-D list containing each candidate’s Google Search results,
-        first name, middle name, last name, full name, min year, state, and candid
-        as elements.
+        - urls: An array whose elements are dictionaries containing each candidate’s
+        Google Search results, first name, middle name, last name, full name,
+        min year, state, and candid as keys.
         - batchSize: an integer that specifies the size of each batch of candidates
         to be scraped in a singular instance of the ThreadPoolExecutor().
     Return
-        - A 3-D list containing the batches as elements. Each batch is itself a 2-D list of maximum size batchSize containing each candidate’s Google Search results, first name, middle name, last name, full name, min year, state, and candid as elements.
+        - A 2-D array containing the batches as elements. Each batch is itself
+        an array of maximum size batchSize whose elements are dictionaries containing
+        each candidate’s Google Search results, first name, middle name, last name,
+        full name, min year, state, and candid as keys.
     """
 
     # verifies parameters
@@ -181,22 +191,21 @@ def bioData(link):
     Description
         - Wrapper function used to scrape the source URLs for each candidate.
     Parameters
-        - link: A 2D array containing the top r URLs from the Google Search,
+        - link: A dictionary containing the top r URLs from the Google Search,
         first name, middle name, last name, full name, min year, state, and
-        candid of the candidate. The element containing the top r URLs is a
+        candid of the candidate. The value containing the top r URLs is a
         string array.
     Return
-        - An array containing plain text scraped from the source URLs, the
+        - A dictionary containing plain text scraped from the source URLs, the
         source URLs, full name, year, state, and candid of a candidate. The
-        element containing the source URLs is a string array.
+        value containing the source URLs is a string array.
     """
 
     # initializes utility variables for scraping
-    info = []
     summaries = []
 
     # scrapes candidate source URLs
-    for url in link[0]:
+    for url in link["Sources"]:
         if url != "nan":  # verifies URL exists
             try:
                 s = time.perf_counter()
@@ -222,16 +231,16 @@ def bioData(link):
                     )  # removes html tags, leading and trailing whitespaces, and makes text lowercase
 
                 # scrapes text after last name if present
-                if link[3] != "nan":
-                    summary = grabber(information, link[3])
+                if link["Last"] != "nan":
+                    summary = grabber(information, link["Last"])
 
                 # scrapes text after first name if present and last name not present
-                if link[1] != "nan" and not summary:
-                    summary = grabber(information, link[1])
+                if link["First"] != "nan" and not summary:
+                    summary = grabber(information, link["First"])
 
                 # scrapes text after middle name if present and last name and first name not present
-                if link[2] != "nan" and not summary:
-                    summary = grabber(information, link[2])
+                if link["Middle"] != "nan" and not summary:
+                    summary = grabber(information, link["Middle"])
 
                 summaries.append(summary)
                 doneScraping = time.perf_counter()
@@ -239,8 +248,9 @@ def bioData(link):
             except:
                 continue
 
-    info += [" ".join(summaries), link[0], link[4], link[5], link[6], link[7]]
-    return info
+    link["Prompt"] = " ".join(summaries)
+
+    return link
 
 
 def pdfReader(url):
@@ -308,26 +318,29 @@ def chatPrompt(info):
         - Creates a ChatGPT prompt for the candidate using the scraped text from
         its source URLs.
     Parameters
-        - info: An array containing plain text scraped from the source URLs, the
+        - info: A dictionary containing plain text scraped from the source URLs, the
         source URLs, full name, year, state, and candid of a candidate. This is
-        exactly the output of the bioData() function. The element containing the
+        exactly the output of the bioData() function. The value containing the
         source URLs is a string array.
     Return
-        - An array containing the ChatGPT prompt, source URLs, full name, min
-        year, state, and candid of a candidate. The element containing the source
+        - A dictionary containing the ChatGPT prompt, source URLs, full name, min
+        year, state, and candid of a candidate. The value containing the source
         URLs is a string array.
     """
 
     p = f"Extract ONLY the College Major, Undergraduate Institution, Highest Degree \
-        and Institution, and Work History of {info[2].title()}, a state representative \
-        candidate from {info[4]}, from the following text: {info[0]}. If any desired \
+        and Institution, and Work History of {info['Full'].title()}, a state representative \
+        candidate from {info['State']}, from the following text: {info['Prompt']}. If any desired \
         information is not present in the given text, write N/A instead. Determine \
         your confidence that the information you previously extracted correctly \
-        describes {info[2].title()}, a {info[3]} state representative candidate from \
-        {info[4]}, on a scale of 1 to 100. Display the college major, undergraduate \
+        describes {info['Full'].title()}, a {info['Min Year']} state representative candidate from \
+        {info['State']}, on a scale of 1 to 100. Display the college major, undergraduate \
         institution, highest degree and institution, work history, and your confidence \
         level as 5 elements of a JSON object."
-    return [p, info[1], info[2], info[3], info[4], info[5]]
+
+    info["Prompt"] = f"{p} {info['Prompt']}"
+
+    return info
 
 
 def retrieveCSV(prompts):
@@ -338,10 +351,10 @@ def retrieveCSV(prompts):
         successfully and unsuccessfully scraped candidates, storing the
         information in retrievals.csv and scrapingTimeouts.csv, respectively.
     Parameters
-        - prompt: a 2D array containing the relevant candidate information for
-        each candidate as the elements in the array. Each element is itself an
-        array containing the ChatGPT prompt, source URLs, full name, min year,
-        state, and candid of the candidate. The element containing the source
+        - prompts: an array containing the relevant candidate information for
+        each candidate as the elements in the array. Each element is itself a
+        dictionary containing the ChatGPT prompt, source URLs, full name, min year,
+        state, and candid of the candidate. The value containing the source
         URLs is a string array.
     Return
         - A dataframe containing each candidate’s ChatGPT prompt, sources, full
@@ -363,14 +376,14 @@ def retrieveCSV(prompts):
     for cand in timeoutCandidates:
         if len(cand) == 8:  # verifies candidate info has correct format
             try:
-                failData["Sources"].append(cand[0])
-                failData["First"].append(cand[1])
-                failData["Middle"].append(cand[2])
-                failData["Last"].append(cand[3])
-                failData["Full"].append(cand[4])
-                failData["Min Year"].append(cand[5])
-                failData["State"].append(cand[6])
-                failData["Candid"].append(cand[7])
+                failData["Sources"].append(cand["Sources"])
+                failData["First"].append(cand["First"])
+                failData["Middle"].append(cand["Middle"])
+                failData["Last"].append(cand["Last"])
+                failData["Full"].append(cand["Full"])
+                failData["Min Year"].append(cand["Min Year"])
+                failData["State"].append(cand["State"])
+                failData["Candid"].append(cand["Candid"])
             except:
                 continue
     df = pd.DataFrame(
@@ -399,22 +412,15 @@ def retrieveCSV(prompts):
     }
     for cand in prompts:
         if cand != None:
-            if len(cand) == 6:  # verifies candidate info has correct format
-                try:
-                    rawData["ChatGPT Prompt"].append(cand[0])
-                    try:
-                        s = []
-                        for i in range(4):
-                            s.append(cand[1][i])
-                        rawData["Sources"].append(s)
-                    except:
-                        rawData["Sources"].append("N/A")
-                    rawData["Full Name"].append(cand[2])
-                    rawData["Min Year"].append(cand[3])
-                    rawData["State"].append(cand[4])
-                    rawData["Candid"].append(cand[5])
-                except:
-                    continue
+            try:
+                rawData["ChatGPT Prompt"].append(cand["Prompt"])
+                rawData["Sources"].append(cand["Sources"])
+                rawData["Full Name"].append(cand["Full"])
+                rawData["Min Year"].append(cand["Min Year"])
+                rawData["State"].append(cand["State"])
+                rawData["Candid"].append(cand["Candid"])
+            except:
+                continue
     df = pd.DataFrame(
         rawData,
         columns=[
