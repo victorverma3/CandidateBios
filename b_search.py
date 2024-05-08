@@ -20,7 +20,7 @@ from tenacity import retry, stop_after_attempt, wait_random_exponential
 import time
 
 # Setup
-sourceData = "../Data/ldata_R_unique.csv"  # adjust path if on SCC
+sourceData = "./Data/ldata_R_unique.csv"  # adjust path if on SCC
 
 load_dotenv()
 google_api_key = os.environ.get("google_api_key")
